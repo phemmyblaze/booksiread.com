@@ -1,4 +1,7 @@
 const express = require("express");
+const cookieParser = require("cookie-parser");
+const express_session = require("express-session"); //bring in the session
+const MongoDBSession = require("connect-mongodb-session")(express_session)
 const mongodb = require("mongodb");
 const cors = require("cors");
 const User = require("./auth/User")
@@ -10,12 +13,38 @@ require("dotenv").config(); //for reading .env files
 const server = express();
 
 
-
-
-
 //middleware
-server.use(cors()); 
+const mongo_db_session_store = new MongoDBSession({ 
+    uri: process.env.DB_URL,
+    collection: process.env.SESSION_STORE
+})
+
+
+server.use(express.urlencoded({
+    extended: true
+}))
+
+
+server.use(cookieParser());
+
+//add the express session
+server.use(express_session({
+    resave: false,
+    saveUninitialized: false,
+    secret: "randomkeytosignsessionkey",
+    store: mongo_db_session_store,
+    cookie: {
+        httpOnly: false
+    }
+}))
+
+
+server.use(cors({
+    origin: "http://localhost:3000",
+    credentials: true
+})); 
 server.use(express.json()) //to read json data
+
 
 
 //routes
@@ -24,6 +53,27 @@ server.get("/", (request, response) => {
     response.send({
         message: "Server works fine"
     })
+
+});
+
+
+//logout user
+server.post("/logout-user", async function(request, response){
+    //get the session_id 
+    const session_id = request.body.session_id;
+
+    //if there is a session id .. 
+    console.log("Delete Session ID: ", session_id)
+
+
+    //destroy the current session
+    await request.session.destroy()
+
+    return response.send({
+        message: "user session deleted",
+        code: "logged-out"
+    })
+
 
 });
 
@@ -39,11 +89,22 @@ server.post("/login-user", async function(request, response){
 
 
     if(login_feedback.code === "success"){
-        return response.status(200).send({
-            message: "User may be logged in",
-            code: "success",
-            data: null
-        })
+        
+        //perform the actual logging in ..
+        request.session.user = login_feedback.data;
+
+        if(request.session.user){
+            return response.status(200).send({
+                message: "User may be logged in",
+                code: "success",
+                data: login_feedback.data
+            })
+        }
+
+        //
+
+
+
     }
 
 
@@ -53,6 +114,17 @@ server.post("/login-user", async function(request, response){
         data: null
     })
     
+
+
+
+});
+
+
+server.get("/get-logged-in-user", async (request, response) => {
+
+    const current_session = request.body.current_session;
+
+    console.log(current_session)
 
 
 

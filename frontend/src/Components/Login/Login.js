@@ -1,9 +1,10 @@
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation, Navigate } from "react-router-dom"
 import Navbar from "../Sections/Navbar"
 import { useState } from "react"
 import axios from "axios";
+import { useAuth } from "../../Auths/Auth/Auth";
 
-function Login(){
+function Login(props){
 
     const [currentState, setState] = useState({
         username: "",
@@ -13,8 +14,14 @@ function Login(){
         show_account_login_info: <></>
     });
 
+    const auth = useAuth()
+
+    console.log("Checking: ", auth)
+
 
     const navigate = useNavigate()
+
+    const location = useLocation()
 
     const handleInputUpdate = (event) => {
         let type = event.target.name;
@@ -57,7 +64,7 @@ function Login(){
 
     }
 
-
+   
 
     const loginUser = async (event) => {
         event.preventDefault();
@@ -87,36 +94,38 @@ function Login(){
                                                 </div>
                                             </div>
                 })
-        
                 
-               const login_feedback = await axios.post("/login-user", {
-                    username: currentState.username,
-                    password: currentState.password
-                }, 
-                {
-                    withCredentials: true
-                }
-                )
+
+               //log in the user 
+               let login_result = await auth.loginUser(currentState.username, currentState.password)
 
 
-                //stop the spinner
-                console.log(login_feedback)
-                if(login_feedback.data.code === "success"){
-                    //this user may now be logged in 
+               if(login_result.data.code === "success"){
+                    
                     setState({
+
                         ...currentState,
-                        username: "",
-                        password: "",
                         show_account_login_info: <div className="alert alert-success">You are logged in! Redirecting you to your dashboard ...</div>
+
                     })
-                   setTimeout(() => {
-                            // - go to the home page right away
-                            // - in the navigate function, the second argument is an object with a property 'replace' set to true
-                            //this will prevent the 'back' functionality from working.
-                            //this feature may not work as expected here due to how we are applying it
-                            navigate("user", { replace: true })
-                   }, 2000)
-                }
+
+
+                    setTimeout(function(){
+                        //navigate or redirect the user after 3 seconds to their dashboard
+                        
+                        //navigate to the home page
+                        //set the replace to be true
+                        //this will prevent the user from being able to go back to home
+                        navigate("/user", { replace: true });
+
+                    }, 3000)
+
+
+               }
+
+                
+        
+               
 
         }else{
 
@@ -135,8 +144,23 @@ function Login(){
 
     }
 
+
+    function navigate_to_home(){
+        location.pathname = "/user"
+
+        navigate("/user", { replace: true })
+
+        // Navigate({
+        //     to: "/user",
+        //     replace: true
+        // })
+
+    }
+
     return <>
-        <Navbar></Navbar>
+            {auth.user != null && auth.user.is_user_logged_in === true ? navigate_to_home() : 
+                <>
+                    <Navbar></Navbar>
         <div className="container">
                 <div className="row">
                     <div className="col-md-8 mt-5 mx-auto">
@@ -145,6 +169,9 @@ function Login(){
                                     <div className="card-body">
                                         <h5>Sign in</h5>
                                         <hr />
+                                        
+                                        {!props.children ? '' : props.children }
+
                                         {currentState.show_account_login_info}
 
                                         <form className="form" method="POST" onSubmit={loginUser}>
@@ -178,6 +205,9 @@ function Login(){
                     </div>
                 </div>
             </div>
+                </>
+                
+            }
      </>
 }
 
